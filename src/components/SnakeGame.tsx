@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,10 +39,17 @@ const SnakeGame = () => {
 
   // Function to create random positions for words on the game board
   const generateRandomPosition = () => {
-    return {
-      x: Math.floor(Math.random() * BOARD_SIZE),
-      y: Math.floor(Math.random() * BOARD_SIZE)
-    };
+    let position;
+    let attempts = 0;
+    do {
+      position = {
+        x: Math.floor(Math.random() * BOARD_SIZE),
+        y: Math.floor(Math.random() * BOARD_SIZE)
+      };
+      attempts++;
+    } while (attempts < 50 && snake.some(segment => segment.x === position.x && segment.y === position.y));
+    
+    return position;
   };
 
   // Function to start a new game - resets everything back to the beginning
@@ -109,6 +117,14 @@ const SnakeGame = () => {
         const nextIndex = currentWordIndex + 1;
         setCurrentWordIndex(nextIndex);
         
+        // Check if we've finished all words
+        if (nextIndex >= sightWords.length) {
+          setGameOver(true);
+          setGameRunning(false);
+          speakWord("Congratulations! You collected all the words!");
+          return newSnake; // Snake grows
+        }
+        
         // Add a new word to the board if we haven't finished all words
         if (nextIndex + 4 < sightWords.length) {
           const newWord = {
@@ -146,13 +162,13 @@ const SnakeGame = () => {
             ? { ...w, position: generateRandomPosition() }
             : w
         ));
+        
+        // Snake still grows a little bit even for wrong words
+        return newSnake;
       }
       
-      // Remove the tail since no word was eaten (snake doesn't grow)
-      if (!wrongWord) {
-        newSnake.pop();
-      }
-      
+      // No word was eaten, so remove the tail (snake doesn't grow)
+      newSnake.pop();
       return newSnake;
     });
   }, [direction, gameOver, gameRunning, currentWordIndex, wordsOnBoard]);
@@ -187,7 +203,7 @@ const SnakeGame = () => {
   useEffect(() => {
     if (!gameRunning) return;
     
-    const gameInterval = setInterval(moveSnake, 200); // Move every 200 milliseconds
+    const gameInterval = setInterval(moveSnake, 300); // Move every 300 milliseconds (slightly slower)
     return () => clearInterval(gameInterval);
   }, [moveSnake, gameRunning]);
 
@@ -198,6 +214,11 @@ const SnakeGame = () => {
     }
     setGameRunning(!gameRunning);
   };
+
+  // Initialize the game when component first loads
+  useEffect(() => {
+    startNewGame();
+  }, []);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -227,7 +248,7 @@ const SnakeGame = () => {
 
       {/* Current Target Word Display */}
       <WordDisplay 
-        currentWord={sightWords[currentWordIndex]} 
+        currentWord={currentWordIndex < sightWords.length ? sightWords[currentWordIndex] : null} 
         wordsOnBoard={wordsOnBoard}
         gameRunning={gameRunning}
       />
@@ -267,11 +288,11 @@ const SnakeGame = () => {
                       className={`
                         border border-green-200 flex items-center justify-center text-xs font-bold
                         ${isSnake ? (isHead ? 'bg-green-600' : 'bg-green-400') : ''}
-                        ${wordHere ? (isTargetWord ? 'bg-yellow-300' : 'bg-blue-200') : ''}
+                        ${wordHere && !isSnake ? (isTargetWord ? 'bg-yellow-300' : 'bg-blue-200') : ''}
                       `}
                     >
-                      {wordHere && (
-                        <span className={isTargetWord ? 'text-red-600' : 'text-blue-600'}>
+                      {wordHere && !isSnake && (
+                        <span className={`${isTargetWord ? 'text-red-600' : 'text-blue-600'} text-center leading-tight`}>
                           {wordHere.word}
                         </span>
                       )}
@@ -282,10 +303,15 @@ const SnakeGame = () => {
               
               {gameOver && (
                 <div className="text-center mt-4 p-4 bg-red-100 rounded-lg">
-                  <h3 className="text-xl font-bold text-red-800 mb-2">Game Over!</h3>
+                  <h3 className="text-xl font-bold text-red-800 mb-2">
+                    {currentWordIndex >= sightWords.length ? 'Congratulations! 🎉' : 'Game Over!'}
+                  </h3>
                   <p className="text-red-600">
                     Final Score: {score} | Words Collected: {currentWordIndex} | Words Missed: {missedWords.length}
                   </p>
+                  {currentWordIndex >= sightWords.length && (
+                    <p className="text-green-600 mt-2">You collected all the sight words!</p>
+                  )}
                 </div>
               )}
             </CardContent>
