@@ -1,45 +1,75 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trophy, User, Target, AlertCircle } from 'lucide-react';
+import { Trophy, User, Target, AlertCircle, Clock } from 'lucide-react';
 
-// Component that tracks and displays high scores
-const Leaderboard = ({ currentScore, playerName, wordsCollected, missedWords, gameOver }) => {
-  // State to store all the game scores (saved in browser storage)
-  const [scores, setScores] = useState([]);
+interface GameScore {
+  id: number;
+  playerName: string;
+  score: number;
+  wordsCollected: number;
+  missedWords: string[];
+  date: string;
+  timeElapsed?: number;
+}
 
-  // Load saved scores when component first loads
+interface LeaderboardProps {
+  currentScore: number;
+  playerName: string;
+  wordsCollected: number;
+  missedWords: string[];
+  gameOver: boolean;
+}
+
+const Leaderboard: React.FC<LeaderboardProps> = ({
+  currentScore,
+  playerName,
+  wordsCollected,
+  missedWords,
+  gameOver,
+}) => {
+  const [scores, setScores] = useState<GameScore[]>([]);
+
+  // Format time display
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  // Load saved scores
   useEffect(() => {
     const savedScores = localStorage.getItem('snakeGameScores');
     if (savedScores) {
-      setScores(JSON.parse(savedScores));
+      try {
+        setScores(JSON.parse(savedScores));
+      } catch (error) {
+        console.error('Error parsing saved scores:', error);
+      }
     }
   }, []);
 
-  // Save a new score when the game ends
+  // Save current score
   const saveScore = () => {
     if (!playerName.trim() || !gameOver) return;
 
-    const newScore = {
-      id: Date.now(), // Unique ID for each game
+    const newScore: GameScore = {
+      id: Date.now(),
       playerName: playerName.trim(),
       score: currentScore,
-      wordsCollected: wordsCollected,
-      missedWords: [...missedWords], // Copy the array
-      date: new Date().toLocaleDateString() // When the game was played
+      wordsCollected,
+      missedWords: [...missedWords],
+      date: new Date().toLocaleDateString(),
     };
 
-    const updatedScores = [...scores, newScore];
-    // Keep only the top 10 scores
-    const topScores = updatedScores
-      .sort((a, b) => b.score - a.score) // Sort by highest score first
-      .slice(0, 10); // Keep only top 10
-
-    setScores(topScores);
-    localStorage.setItem('snakeGameScores', JSON.stringify(topScores));
+    const updatedScores = [...scores, newScore]
+      .sort((a, b) => b.score - a.score
+  )
+    setScores(updatedScores);
+    localStorage.setItem('snakeGameScores', JSON.stringify(updatedScores));
   };
 
-  // Clear all saved scores
+  // Clear all scores
   const clearLeaderboard = () => {
     setScores([]);
     localStorage.removeItem('snakeGameScores');
@@ -54,15 +84,14 @@ const Leaderboard = ({ currentScore, playerName, wordsCollected, missedWords, ga
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        
         {/* Current Game Stats */}
-        {gameOver && playerName && (
+        {gameOver && (
           <div className="p-3 bg-green-100 rounded-lg border border-green-300">
             <h4 className="font-bold text-green-800 mb-2">Your Game:</h4>
             <div className="text-sm space-y-1">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4" />
-                {playerName}
+                {playerName || 'Anonymous'}
               </div>
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4" />
@@ -76,15 +105,19 @@ const Leaderboard = ({ currentScore, playerName, wordsCollected, missedWords, ga
                 <AlertCircle className="w-4 h-4" />
                 Missed: {missedWords.length}
               </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+              </div>
             </div>
-            <Button 
-              onClick={saveScore} 
-              className="w-full mt-2" 
-              size="sm"
-              disabled={!playerName.trim()}
-            >
-              Save Score
-            </Button>
+            {playerName.trim() && (
+              <Button 
+                onClick={saveScore} 
+                className="w-full mt-2" 
+                size="sm"
+              >
+                Save Score
+              </Button>
+            )}
           </div>
         )}
 
@@ -96,7 +129,7 @@ const Leaderboard = ({ currentScore, playerName, wordsCollected, missedWords, ga
               No scores yet. Be the first to play!
             </p>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
               {scores.map((score, index) => (
                 <div 
                   key={score.id} 
@@ -124,14 +157,19 @@ const Leaderboard = ({ currentScore, playerName, wordsCollected, missedWords, ga
                       <div className="text-xs text-gray-600">
                         {score.wordsCollected} words
                       </div>
+                      {score.timeElapsed && (
+                        <div className="text-xs text-gray-600">
+                          {formatTime(score.timeElapsed)}
+                        </div>
+                      )}
                     </div>
                   </div>
                   
-                  {/* Show missed words if any */}
                   {score.missedWords.length > 0 && (
                     <div className="mt-1 text-xs">
                       <span className="text-red-600">
-                        Missed: {score.missedWords.join(', ')}
+                        Missed: {score.missedWords.slice(0, 3).join(', ')}
+                        {score.missedWords.length > 3 ? '...' : ''}
                       </span>
                     </div>
                   )}

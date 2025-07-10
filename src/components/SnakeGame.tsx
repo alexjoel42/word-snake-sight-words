@@ -1,131 +1,198 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import WordDisplay from './WordDisplay';
 import Leaderboard from './Leaderboard';
 import { sightWords } from '../data/sightWords';
-import { Play, Pause, RotateCcw } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, ChevronDown } from 'lucide-react';
 
-// Game board dimensions - these control how big our playing field is
-const BOARD_SIZE = 20; // 20x20 grid
-const INITIAL_SNAKE = [{ x: 10, y: 10 }]; // Snake starts in the middle
-const INITIAL_DIRECTION = { x: 0, y: -1 }; // Snake starts moving up
+// Game constants
+const BOARD_SIZE = 20;
+const INITIAL_SNAKE = [{ x: 10, y: 10 }];
+const INITIAL_DIRECTION = { x: 0, y: -1 };
+const INITIAL_SPEED = 300;
+const SPEED_INCREMENT = 15;
+const MIN_SPEED = 80;
 
-// Main Snake Game component - this handles all the game logic
 const SnakeGame = () => {
-  // Game state variables - these keep track of everything happening in the game
-  const [snake, setSnake] = useState(INITIAL_SNAKE); // Where each part of the snake is
-  const [direction, setDirection] = useState(INITIAL_DIRECTION); // Which way snake is moving
-  const [wordsOnBoard, setWordsOnBoard] = useState([]); // The 5 words currently visible
-  const [currentWordIndex, setCurrentWordIndex] = useState(0); // Which word we're looking for next
-  const [score, setScore] = useState(0); // Player's current score
-  const [gameRunning, setGameRunning] = useState(false); // Is the game currently playing?
-  const [gameOver, setGameOver] = useState(false); // Did the snake crash?
-  const [playerName, setPlayerName] = useState(''); // Player's name for the leaderboard
-  const [missedWords, setMissedWords] = useState([]); // Words the player got wrong
+  // Game state
+  const [snake, setSnake] = useState(INITIAL_SNAKE);
+  const [direction, setDirection] = useState(INITIAL_DIRECTION);
+  const [wordsOnBoard, setWordsOnBoard] = useState([]);
+  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const [score, setScore] = useState(0);
+  const [gameRunning, setGameRunning] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [playerName, setPlayerName] = useState('');
+  const [missedWords, setMissedWords] = useState([]);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [speed, setSpeed] = useState(INITIAL_SPEED);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState('');
+  const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
+  const [timeElapsed, setTimeElapsed] = useState(0);
 
-  // Function to make the computer read words out loud
-  const speakWord = (word) => {
-    // Check if the browser supports text-to-speech
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.rate = 0.8; // Speak a bit slower for learning
-      utterance.volume = 0.7; // Not too loud
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  // Function to create random positions for words on the game board
-  const generateRandomPosition = () => {
+  // Generate random position for words
+  const generateRandomPosition = useCallback(() => {
     let position;
     let attempts = 0;
+    const maxAttempts = 100;
+    
     do {
       position = {
         x: Math.floor(Math.random() * BOARD_SIZE),
         y: Math.floor(Math.random() * BOARD_SIZE)
       };
       attempts++;
-    } while (attempts < 50 && snake.some(segment => segment.x === position.x && segment.y === position.y));
+    } while (
+      attempts < maxAttempts && 
+      snake.some(segment => segment.x === position.x && segment.y === position.y)
+    );
     
     return position;
-  };
+  }, [snake]);
 
-  // Function to start a new game - resets everything back to the beginning
-  const startNewGame = () => {
+  // Enhanced speech function with double pronunciation
+  const speakWord = useCallback((word) => {
+    if (!voiceEnabled || !selectedVoice) return;
+    
+    window.speechSynthesis.cancel();
+    
+    const speak = () => {
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      
+      const voice = availableVoices.find(v => v.name === selectedVoice);
+      if (voice) utterance.voice = voice;
+      
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (error) {
+        console.error('Speech error:', error);
+      }
+    };
+
+    // Speak immediately
+    speak();
+    
+    // Speak again after 3 seconds
+    setTimeout(speak, 3000);
+  }, [voiceEnabled, selectedVoice, availableVoices]);
+
+  // Initialize game
+  const startNewGame = useCallback(() => {
     setSnake(INITIAL_SNAKE);
     setDirection(INITIAL_DIRECTION);
     setCurrentWordIndex(0);
     setScore(0);
     setGameOver(false);
     setMissedWords([]);
+    setSpeed(INITIAL_SPEED);
+    setTimeElapsed(0);
     
-    // Put the first 5 sight words on the board in random positions
+    // Place initial words on board
     const initialWords = sightWords.slice(0, 5).map((word) => ({
       word,
       position: generateRandomPosition()
     }));
     setWordsOnBoard(initialWords);
     
-    // Read the first word to help the player know what to look for
+    // Speak the first word twice
     if (sightWords[0]) {
       setTimeout(() => speakWord(sightWords[0]), 500);
     }
-  };
+  }, [generateRandomPosition, speakWord]);
 
-  // Function that runs every time the snake moves
+  // Load available voices
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      setAvailableVoices(voices.filter(v => v.lang.includes('en')));
+      
+      const preferredVoices = [
+        'Samantha', // macOS
+        'Google US English', // Chrome
+        'Microsoft Zira', // Windows Edge
+        'Karen', // Australian
+        'Tessa' // South African
+      ];
+      
+      const foundVoice = voices.find(v => 
+        preferredVoices.includes(v.name) && v.lang.includes('en')
+      );
+      
+      if (foundVoice) setSelectedVoice(foundVoice.name);
+    };
+
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
+  // Timer effect
+  useEffect(() => {
+    let timer;
+    if (gameRunning && !gameOver) {
+      timer = setInterval(() => {
+        setTimeElapsed(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [gameRunning, gameOver]);
+
+  // Game movement logic
   const moveSnake = useCallback(() => {
-    // Don't move if game is over or not running
     if (gameOver || !gameRunning) return;
 
     setSnake(currentSnake => {
       const newSnake = [...currentSnake];
       const head = { ...newSnake[0] };
       
-      // Move the snake's head in the current direction
+      // Move head
       head.x += direction.x;
       head.y += direction.y;
       
-      // Check if snake hit the walls (game over!)
+      // Check collisions
       if (head.x < 0 || head.x >= BOARD_SIZE || head.y < 0 || head.y >= BOARD_SIZE) {
         setGameOver(true);
         setGameRunning(false);
         return currentSnake;
       }
       
-      // Check if snake hit itself (game over!)
       if (newSnake.some(segment => segment.x === head.x && segment.y === head.y)) {
         setGameOver(true);
         setGameRunning(false);
         return currentSnake;
       }
       
-      // Add the new head to the front of the snake
       newSnake.unshift(head);
       
-      // Check if snake ate a word
+      // Check word collection
       const targetWord = sightWords[currentWordIndex];
       const wordOnBoard = wordsOnBoard.find(w => w.word === targetWord);
       
       if (wordOnBoard && head.x === wordOnBoard.position.x && head.y === wordOnBoard.position.y) {
-        // Snake ate the correct word! 
-        setScore(prev => prev + 10); // Give points
-        speakWord(targetWord); // Read the word out loud
+        setScore(prev => prev + 10);
+        setSpeed(prev => Math.max(prev - SPEED_INCREMENT, MIN_SPEED));
         
-        // Move to the next word in our list
         const nextIndex = currentWordIndex + 1;
         setCurrentWordIndex(nextIndex);
         
-        // Check if we've finished all words
         if (nextIndex >= sightWords.length) {
           setGameOver(true);
           setGameRunning(false);
           speakWord("Congratulations! You collected all the words!");
-          return newSnake; // Snake grows
+          return newSnake;
         }
         
-        // Add a new word to the board if we haven't finished all words
+        // Speak the new target word
+        setTimeout(() => speakWord(sightWords[nextIndex]), 500);
+        
         if (nextIndex + 4 < sightWords.length) {
           const newWord = {
             word: sightWords[nextIndex + 4],
@@ -138,47 +205,44 @@ const SnakeGame = () => {
             return updated;
           });
         } else {
-          // Remove the eaten word but don't add new ones (we're near the end)
           setWordsOnBoard(prev => prev.filter(w => w.word !== targetWord));
         }
         
-        // Snake grows by keeping the tail (don't remove the last segment)
         return newSnake;
       }
       
-      // Check if snake ate the wrong word
+      // Check wrong word collision
       const wrongWord = wordsOnBoard.find(w => 
         w.position.x === head.x && w.position.y === head.y && w.word !== targetWord
       );
       
       if (wrongWord) {
-        // Snake ate wrong word - add to missed words but don't end game
         setMissedWords(prev => [...prev, wrongWord.word]);
-        speakWord("Try again!"); // Give encouraging feedback
+        speakWord("Try again!");
         
-        // Move the wrong word to a new position
         setWordsOnBoard(prev => prev.map(w => 
           w.word === wrongWord.word 
             ? { ...w, position: generateRandomPosition() }
             : w
         ));
         
-        // Snake still grows a little bit even for wrong words
         return newSnake;
       }
       
-      // No word was eaten, so remove the tail (snake doesn't grow)
       newSnake.pop();
       return newSnake;
     });
-  }, [direction, gameOver, gameRunning, currentWordIndex, wordsOnBoard]);
+  }, [direction, gameOver, gameRunning, currentWordIndex, wordsOnBoard, speakWord, generateRandomPosition]);
 
-  // Handle keyboard input for controlling the snake
+  // Keyboard controls
   useEffect(() => {
     const handleKeyPress = (e) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+      }
+
       if (!gameRunning) return;
       
-      // Prevent the snake from going backwards into itself
       switch (e.key) {
         case 'ArrowUp':
           if (direction.y === 0) setDirection({ x: 0, y: -1 });
@@ -199,15 +263,15 @@ const SnakeGame = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [direction, gameRunning]);
 
-  // Game loop - this makes the snake move automatically
+  // Game loop
   useEffect(() => {
     if (!gameRunning) return;
     
-    const gameInterval = setInterval(moveSnake, 300); // Move every 300 milliseconds (slightly slower)
-    return () => clearInterval(gameInterval);
-  }, [moveSnake, gameRunning]);
+    const interval = setInterval(moveSnake, speed);
+    return () => clearInterval(interval);
+  }, [moveSnake, gameRunning, speed]);
 
-  // Function to start or pause the game
+  // Toggle game state
   const toggleGame = () => {
     if (gameOver) {
       startNewGame();
@@ -215,14 +279,36 @@ const SnakeGame = () => {
     setGameRunning(!gameRunning);
   };
 
-  // Initialize the game when component first loads
+  // Initialize game on mount
   useEffect(() => {
     startNewGame();
   }, []);
 
+  const renderGameBoard = () => {
+    return Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, index) => {
+      const x = index % BOARD_SIZE;
+      const y = Math.floor(index / BOARD_SIZE);
+      const isSnake = snake.some(segment => segment.x === x && segment.y === y);
+      const wordHere = wordsOnBoard.find(w => w.position.x === x && w.position.y === y);
+      
+      return (
+        <div
+          key={index}
+          className={`border border-gray-200 flex items-center justify-center text-xs font-bold
+            ${isSnake ? 'bg-green-500' : ''}
+            ${wordHere ? 'bg-blue-100' : ''}`}
+        >
+          {wordHere && !isSnake && (
+            <span className="text-blue-800">{wordHere.word}</span>
+          )}
+        </div>
+      );
+    });
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Game Controls and Score Display */}
+      {/* Game Controls */}
       <div className="flex flex-wrap gap-4 items-center justify-between">
         <div className="flex gap-4 items-center">
           <Input
@@ -239,96 +325,76 @@ const SnakeGame = () => {
             <RotateCcw className="w-4 h-4" />
             Reset
           </Button>
+          <Button 
+            onClick={() => setVoiceEnabled(!voiceEnabled)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {voiceEnabled ? 'Sound On' : 'Sound Off'}
+          </Button>
         </div>
         
         <div className="text-xl font-bold text-green-800">
-          Score: {score} | Words Missed: {missedWords.length}
+          Score: {score} | Words: {currentWordIndex}/{sightWords.length} | Time: {Math.floor(timeElapsed / 60)}:{String(timeElapsed % 60).padStart(2, '0')}
         </div>
       </div>
 
-      {/* Current Target Word Display */}
-      <WordDisplay 
-        currentWord={currentWordIndex < sightWords.length ? sightWords[currentWordIndex] : null} 
-        wordsOnBoard={wordsOnBoard}
-        gameRunning={gameRunning}
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Game Board */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">Game Board</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div 
-                className="grid bg-green-50 border-2 border-green-300 mx-auto"
-                style={{ 
-                  gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)`,
-                  width: '600px',
-                  height: '600px'
+      {/* Voice Selection Dropdown */}
+      <div className="relative">
+        <Button 
+          onClick={() => setShowVoiceDropdown(!showVoiceDropdown)}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          {selectedVoice || "Select Voice"}
+          <ChevronDown className="w-4 h-4" />
+        </Button>
+        {showVoiceDropdown && (
+          <div className="absolute z-10 mt-1 w-56 bg-white shadow-lg rounded-md p-1">
+            {availableVoices.map(voice => (
+              <div
+                key={voice.name}
+                className={`p-2 hover:bg-gray-100 cursor-pointer ${selectedVoice === voice.name ? 'bg-blue-50' : ''}`}
+                onClick={() => {
+                  setSelectedVoice(voice.name);
+                  setShowVoiceDropdown(false);
                 }}
               >
-                {/* Create each cell of the game board */}
-                {Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, index) => {
-                  const x = index % BOARD_SIZE;
-                  const y = Math.floor(index / BOARD_SIZE);
-                  
-                  // Check if this cell contains part of the snake
-                  const isSnake = snake.some(segment => segment.x === x && segment.y === y);
-                  const isHead = snake[0]?.x === x && snake[0]?.y === y;
-                  
-                  // Check if this cell contains a word
-                  const wordHere = wordsOnBoard.find(w => w.position.x === x && w.position.y === y);
-                  const isTargetWord = wordHere?.word === sightWords[currentWordIndex];
-                  
-                  return (
-                    <div
-                      key={index}
-                      className={`
-                        border border-green-200 flex items-center justify-center text-xs font-bold
-                        ${isSnake ? (isHead ? 'bg-green-600' : 'bg-green-400') : ''}
-                        ${wordHere && !isSnake ? (isTargetWord ? 'bg-yellow-300' : 'bg-blue-200') : ''}
-                      `}
-                    >
-                      {wordHere && !isSnake && (
-                        <span className={`${isTargetWord ? 'text-red-600' : 'text-blue-600'} text-center leading-tight`}>
-                          {wordHere.word}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+                {voice.name} ({voice.lang})
               </div>
-              
-              {gameOver && (
-                <div className="text-center mt-4 p-4 bg-red-100 rounded-lg">
-                  <h3 className="text-xl font-bold text-red-800 mb-2">
-                    {currentWordIndex >= sightWords.length ? 'Congratulations! 🎉' : 'Game Over!'}
-                  </h3>
-                  <p className="text-red-600">
-                    Final Score: {score} | Words Collected: {currentWordIndex} | Words Missed: {missedWords.length}
-                  </p>
-                  {currentWordIndex >= sightWords.length && (
-                    <p className="text-green-600 mt-2">You collected all the sight words!</p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Leaderboard */}
-        <div className="lg:col-span-1">
-          <Leaderboard 
-            currentScore={score}
-            playerName={playerName}
-            wordsCollected={currentWordIndex}
-            missedWords={missedWords}
-            gameOver={gameOver}
-          />
-        </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Game Board */}
+      <div className="grid bg-gray-50 border-2 border-gray-300 mx-auto"
+        style={{ 
+          gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)`,
+          width: '600px',
+          height: '600px'
+        }}>
+        {renderGameBoard()}
+      </div>
+
+      {/* Feedback Display */}
+      {gameOver && currentWordIndex < sightWords.length && (
+        <div className="text-center p-4 bg-yellow-100 rounded-lg">
+          <h3 className="text-xl font-bold">
+            The target word was: <span className="text-red-600 underline">{sightWords[currentWordIndex]}</span>
+          </h3>
+        </div>
+      )}
+
+      {/* Leaderboard */}
+      <Leaderboard 
+        currentScore={score}
+        playerName={playerName}
+        wordsCollected={currentWordIndex}
+        missedWords={missedWords}
+        gameOver={gameOver}
+      />
     </div>
   );
 };
