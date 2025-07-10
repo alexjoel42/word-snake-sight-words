@@ -1,6 +1,6 @@
 // Phoneme-Focused Word List for K-4th Grade
 // Organized by phonics patterns and difficulty (Science of Reading aligned)
-export const phonemeWords = [
+export const sightWords = [
   // --- Kindergarten Level (CVC & Basic Consonants) ---
   // Short vowels
   'cat', 'bed', 'pig', 'dog', 'sun', // Basic CVC
