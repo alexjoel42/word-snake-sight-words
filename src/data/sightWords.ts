@@ -1,32 +1,50 @@
-
-// The 100 most common English sight words that children learn
-// These are arranged roughly in order of frequency and learning difficulty
-export const sightWords = [
-  // First 25 - Most basic and common words
-  'the', 'a', 'and', 'to', 'of',
-  'in', 'I', 'you', 'it', 'he',
-  'was', 'for', 'on', 'are', 'as',
-  'with', 'his', 'they', 'be', 'at',
-  'one', 'have', 'this', 'from', 'or',
+// Phoneme-Focused Word List for K-4th Grade
+// Organized by phonics patterns and difficulty (Science of Reading aligned)
+export const phonemeWords = [
+  // --- Kindergarten Level (CVC & Basic Consonants) ---
+  // Short vowels
+  'cat', 'bed', 'pig', 'dog', 'sun', // Basic CVC
+  'hat', 'pen', 'sit', 'log', 'run', 
+  'map', 'red', 'win', 'top', 'cup',
   
-  // Next 25 - Still very common
-  'had', 'by', 'word', 'but', 'not',
-  'what', 'all', 'were', 'we', 'when',
-  'your', 'can', 'said', 'there', 'each',
-  'which', 'she', 'do', 'how', 'their',
-  'if', 'will', 'up', 'other', 'about',
+  // Consonant digraphs
+  'ship', 'chat', 'thin', 'when', 'back',
+  'wish', 'much', 'then', 'what', 'sock',
   
-  // Next 25 - Common words for reading
-  'out', 'many', 'then', 'them', 'these',
-  'so', 'some', 'her', 'would', 'make',
-  'like', 'into', 'him', 'time', 'has',
-  'two', 'more', 'go', 'no', 'way',
-  'could', 'people', 'my', 'than', 'first',
+  // Initial blends
+  'flag', 'frog', 'stop', 'clip', 'drop',
   
-  // Final 25 - Important sight words
-  'water', 'been', 'call', 'who', 'oil',
-  'its', 'now', 'find', 'long', 'down',
-  'day', 'did', 'get', 'come', 'made',
-  'may', 'part', 'over', 'new', 'sound',
-  'take', 'only', 'little', 'work', 'know'
+  // --- 1st Grade Level (Long Vowels & Complex Patterns) ---
+  // Silent-e
+  'cake', 'kite', 'home', 'cube', 'tape',
+  'five', 'bone', 'mule', 'late', 'ride',
+  
+  // Vowel teams
+  'rain', 'feet', 'boat', 'pie', 'play',
+  'see', 'road', 'tie', 'day', 'tree',
+  
+  // R-controlled
+  'car', 'her', 'for', 'star', 'fern',
+  'bird', 'fork', 'hard', 'dirt', 'born',
+  
+  // --- 2nd Grade Level (Multisyllabic & Advanced Patterns) ---
+  // Diphthongs
+  'oil', 'out', 'coin', 'cloud', 'toy',
+  'cow', 'join', 'house', 'joy', 'brown',
+  
+  // Complex vowel teams
+  'book', 'moon', 'saw', 'new', 'food',
+  'draw', 'few', 'soon', 'lawn', 'chew',
+  
+  // Inflectional endings
+  'jumped', 'running', 'wanted', 'happier', 'biggest',
+  
+  // --- 3rd-4th Grade Level (Morphology & Academic Words) ---
+  // Prefixes/suffixes
+  'unhappy', 'recall', 'dislike', 'preheat', 'mistake',
+  'careful', 'slowly', 'teacher', 'hopeful', 'quickest',
+  
+  // Academic vocabulary
+  'explain', 'compare', 'measure', 'observe', 'predict',
+  'between', 'against', 'during', 'before', 'after'
 ];
