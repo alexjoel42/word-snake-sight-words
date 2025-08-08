@@ -13,6 +13,7 @@ const INITIAL_DIRECTION = { x: 0, y: -1 };
 const INITIAL_SPEED = 300;
 const SPEED_INCREMENT = 15;
 const MIN_SPEED = 80;
+const WORD_REPEAT_DELAY = 19000; // 10 seconds
 
 const SnakeGame = () => {
   // Game state
@@ -31,6 +32,45 @@ const SnakeGame = () => {
   const [selectedVoice, setSelectedVoice] = useState('');
   const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [currentWords, setCurrentWords] = useState([]);
+  const [wordCategories, setWordCategories] = useState({});
+  const [currentCategory, setCurrentCategory] = useState('');
+  const [highlightedWord, setHighlightedWord] = useState(null);
+  const [lastWordTime, setLastWordTime] = useState(0);
+
+  // Helper function to get words from categories in order
+  const getRandomWordsFromCategories = () => {
+    const categoryOrder = [
+      'shortVowels',
+      'digraphs',
+      'blends', 
+      'longVowels',
+      'vowelTeams',
+      'diphthongs',
+      'inflectedEndings',
+      'multisyllabic'
+    ];
+
+    let allWords = [];
+    let categoryMap = {};
+
+    for (const category of categoryOrder) {
+      const shuffled = [...sightWords[category]].sort(() => 0.5 - Math.random());
+      const selected = shuffled.slice(0, 5); // Take 5 random words from each category
+      
+      selected.forEach(word => {
+        categoryMap[word] = category;
+        categoryMap[`${word}_category`] = category;
+      });
+      
+      allWords = [...allWords, ...selected];
+    }
+
+    return {
+      words: allWords, // Keep in category order
+      categories: categoryMap
+    };
+  };
 
   // Generate random position for words
   const generateRandomPosition = useCallback(() => {
@@ -74,15 +114,16 @@ const SnakeGame = () => {
       }
     };
 
-    // Speak immediately
-    speak();
-    
-    // Speak again after 3 seconds
-    setTimeout(speak, 3000);
+    speak(); // Speak immediately
+    // setTimeout(speak, 3000); // Speak again after 3 seconds
   }, [voiceEnabled, selectedVoice, availableVoices]);
 
   // Initialize game
   const startNewGame = useCallback(() => {
+    const { words, categories } = getRandomWordsFromCategories();
+    setCurrentWords(words);
+    setWordCategories(categories);
+    
     setSnake(INITIAL_SNAKE);
     setDirection(INITIAL_DIRECTION);
     setCurrentWordIndex(0);
@@ -91,19 +132,48 @@ const SnakeGame = () => {
     setMissedWords([]);
     setSpeed(INITIAL_SPEED);
     setTimeElapsed(0);
+    setHighlightedWord(null);
+    setLastWordTime(0);
     
-    // Place initial words on board
-    const initialWords = sightWords.slice(0, 5).map((word) => ({
+    // Set initial category
+    if (words[0]) {
+      setCurrentCategory(categories[`${words[0]}_category`]);
+    }
+    
+    // Place initial words on board (first 5 words)
+    const initialWords = words.slice(0, 5).map((word) => ({
       word,
       position: generateRandomPosition()
     }));
     setWordsOnBoard(initialWords);
     
     // Speak the first word twice
-    if (sightWords[0]) {
-      setTimeout(() => speakWord(sightWords[0]), 500);
+    if (words[0]) {
+      setTimeout(() => speakWord(words[0]), 500);
+      setLastWordTime(Date.now());
     }
   }, [generateRandomPosition, speakWord]);
+
+  // Check if word needs to be repeated
+  useEffect(() => {
+    if (!gameRunning || gameOver || currentWords.length === 0) return;
+
+    const checkRepeat = setInterval(() => {
+      if (Date.now() - lastWordTime > WORD_REPEAT_DELAY) {
+        const currentWord = currentWords[currentWordIndex];
+        speakWord(currentWord);
+        setHighlightedWord(currentWord);
+        setLastWordTime(Date.now());
+        
+        // Remove highlight after 2 seconds
+        setTimeout(() => {
+          setHighlightedWord(null);
+        }, 2000);
+      }
+    }, 1000);
+
+    return () => clearInterval(checkRepeat);
+  }, [gameRunning, gameOver, currentWordIndex, lastWordTime, currentWords, speakWord]);
 
   // Load available voices
   useEffect(() => {
@@ -153,27 +223,26 @@ const SnakeGame = () => {
       const newSnake = [...currentSnake];
       const head = { ...newSnake[0] };
       
-      // Move head
+      // Move head with wrapping
       head.x += direction.x;
+      if (head.x < 0) head.x = BOARD_SIZE - 1;
+      if (head.x >= BOARD_SIZE) head.x = 0;
       head.y += direction.y;
+      if (head.y < 0) head.y = BOARD_SIZE - 1;
+      if (head.y >= BOARD_SIZE) head.y = 0;
       
-      // Check collisions
-      if (head.x < 0 || head.x >= BOARD_SIZE || head.y < 0 || head.y >= BOARD_SIZE) {
-        setGameOver(true);
-        setGameRunning(false);
-        return currentSnake;
-      }
-      
-      if (newSnake.some(segment => segment.x === head.x && segment.y === head.y)) {
-        setGameOver(true);
-        setGameRunning(false);
-        return currentSnake;
+      // Handle self-collision (shrink snake)
+      const collisionIndex = newSnake.findIndex(segment => segment.x === head.x && segment.y === head.y);
+      if (collisionIndex > 0) {
+        newSnake.splice(collisionIndex);
+        setSpeed(prev => Math.min(prev + SPEED_INCREMENT * 2, INITIAL_SPEED));
+        return newSnake;
       }
       
       newSnake.unshift(head);
       
       // Check word collection
-      const targetWord = sightWords[currentWordIndex];
+      const targetWord = currentWords[currentWordIndex];
       const wordOnBoard = wordsOnBoard.find(w => w.word === targetWord);
       
       if (wordOnBoard && head.x === wordOnBoard.position.x && head.y === wordOnBoard.position.y) {
@@ -182,31 +251,43 @@ const SnakeGame = () => {
         
         const nextIndex = currentWordIndex + 1;
         setCurrentWordIndex(nextIndex);
+        setLastWordTime(Date.now());
+        setHighlightedWord(null);
         
-        if (nextIndex >= sightWords.length) {
+        // Check if game is complete
+        if (nextIndex >= currentWords.length) {
           setGameOver(true);
           setGameRunning(false);
           speakWord("Congratulations! You collected all the words!");
           return newSnake;
         }
         
-        // Speak the new target word
-        setTimeout(() => speakWord(sightWords[nextIndex]), 500);
+        // Check if moving to new category
+        const currentCat = wordCategories[`${targetWord}_category`];
+        const nextWord = currentWords[nextIndex];
+        const nextCat = wordCategories[`${nextWord}_category`];
         
-        if (nextIndex + 4 < sightWords.length) {
-          const newWord = {
-            word: sightWords[nextIndex + 4],
-            position: generateRandomPosition()
-          };
-          
-          setWordsOnBoard(prev => {
-            const updated = prev.filter(w => w.word !== targetWord);
-            updated.push(newWord);
-            return updated;
-          });
-        } else {
-          setWordsOnBoard(prev => prev.filter(w => w.word !== targetWord));
+        if (currentCat !== nextCat) {
+          speakWord(`Great job! Now let's try ${nextCat.replace(/([A-Z])/g, ' $1').toLowerCase()}`);
         }
+        
+        setCurrentCategory(nextCat);
+        
+        // Speak the new target word
+        setTimeout(() => speakWord(nextWord), 500);
+        
+        // Place next set of words (current + next 4)
+        const nextWordsToShow = currentWords.slice(
+          nextIndex,
+          Math.min(nextIndex + 5, currentWords.length)
+        );
+        
+        const newBoardWords = nextWordsToShow.map(word => ({
+          word,
+          position: generateRandomPosition()
+        }));
+        
+        setWordsOnBoard(newBoardWords);
         
         return newSnake;
       }
@@ -218,8 +299,9 @@ const SnakeGame = () => {
       
       if (wrongWord) {
         setMissedWords(prev => [...prev, wrongWord.word]);
-        speakWord("Try again!");
+        speakWord("Try again! Look for: " + targetWord);
         
+        // Move wrong word to new position
         setWordsOnBoard(prev => prev.map(w => 
           w.word === wrongWord.word 
             ? { ...w, position: generateRandomPosition() }
@@ -232,7 +314,7 @@ const SnakeGame = () => {
       newSnake.pop();
       return newSnake;
     });
-  }, [direction, gameOver, gameRunning, currentWordIndex, wordsOnBoard, speakWord, generateRandomPosition]);
+  }, [direction, gameOver, gameRunning, currentWordIndex, wordsOnBoard, speakWord, generateRandomPosition, currentWords, wordCategories]);
 
   // Keyboard controls
   useEffect(() => {
@@ -290,16 +372,20 @@ const SnakeGame = () => {
       const y = Math.floor(index / BOARD_SIZE);
       const isSnake = snake.some(segment => segment.x === x && segment.y === y);
       const wordHere = wordsOnBoard.find(w => w.position.x === x && w.position.y === y);
+      const isHighlighted = wordHere && highlightedWord === wordHere.word;
       
       return (
         <div
           key={index}
           className={`border border-gray-200 flex items-center justify-center text-xs font-bold
             ${isSnake ? 'bg-green-500' : ''}
-            ${wordHere ? 'bg-blue-100' : ''}`}
+            ${wordHere ? 'bg-blue-100' : ''}
+            ${isHighlighted ? '!bg-green-200' : ''}`}
         >
           {wordHere && !isSnake && (
-            <span className="text-blue-800">{wordHere.word}</span>
+            <span className={`text-blue-800 ${isHighlighted ? 'font-extrabold text-lg' : ''}`}>
+              {wordHere.word}
+            </span>
           )}
         </div>
       );
@@ -336,7 +422,9 @@ const SnakeGame = () => {
         </div>
         
         <div className="text-xl font-bold text-green-800">
-          Score: {score} | Words: {currentWordIndex}/{sightWords.length} | Time: {Math.floor(timeElapsed / 60)}:{String(timeElapsed % 60).padStart(2, '0')}
+          Score: {score} | Level: {currentCategory} | 
+          Words: {currentWordIndex % 5 + 1}/5 | 
+          Time: {Math.floor(timeElapsed / 60)}:{String(timeElapsed % 60).padStart(2, '0')}
         </div>
       </div>
 
@@ -379,10 +467,12 @@ const SnakeGame = () => {
       </div>
 
       {/* Feedback Display */}
-      {gameOver && currentWordIndex < sightWords.length && (
+      {gameOver && (
         <div className="text-center p-4 bg-yellow-100 rounded-lg">
           <h3 className="text-xl font-bold">
-            The target word was: <span className="text-red-600 underline">{sightWords[currentWordIndex]}</span>
+            {currentWordIndex >= currentWords.length ? 
+              "You won! Great job!" : 
+              `The target word was: ${currentWords[currentWordIndex]}`}
           </h3>
         </div>
       )}

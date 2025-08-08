@@ -1,50 +1,84 @@
-// Phoneme-Focused Word List for K-4th Grade
-// Organized by phonics patterns and difficulty (Science of Reading aligned)
-export const sightWords = [
-  // --- Kindergarten Level (CVC & Basic Consonants) ---
-  // Short vowels
-  'cat', 'bed', 'pig', 'dog', 'sun', // Basic CVC
-  'hat', 'pen', 'sit', 'log', 'run', 
-  'map', 'red', 'win', 'top', 'cup',
-  
+import React from 'react';
+
+export const sightWords = {
+  // Short vowels (CVC words)
+  shortVowels: [
+    'cat', 'bed', 'pig', 'dog', 'sun',
+    'map', 'red', 'dig', 'log', 'run',
+    'fan', 'jet', 'win', 'fox', 'cup',
+    'pan', 'net', 'lip', 'hop', 'bug',
+    'rat', 'web', 'zip', 'cot', 'tub',
+    'sat', 'leg', 'sit', 'dot', 'mud',
+    'tag', 'pen', 'fin', 'pop', 'nut',
+    'wag', 'hen', 'pin', 'rod', 'cut'
+  ],
+
   // Consonant digraphs
-  'ship', 'chat', 'thin', 'when', 'back',
-  'wish', 'much', 'then', 'what', 'sock',
-  
-  // Initial blends
-  'flag', 'frog', 'stop', 'clip', 'drop',
-  
-  // --- 1st Grade Level (Long Vowels & Complex Patterns) ---
-  // Silent-e
-  'cake', 'kite', 'home', 'cube', 'tape',
-  'five', 'bone', 'mule', 'late', 'ride',
-  
+  digraphs: [
+    'ship', 'fish', 'wish', 'rash', 'shell',
+    'chat', 'chip', 'chop', 'rich', 'such',
+    'thin', 'thick', 'path', 'math', 'with',
+    'back', 'sock', 'duck', 'neck', 'rock'
+  ],
+
+  // Consonant blends
+  blends: [
+    'stop', 'snap', 'swim', 'spot', 'slip',
+    'flag', 'clip', 'plan', 'glad', 'plus',
+    'frog', 'drop', 'grin', 'trap', 'brick'
+  ],
+
+  // Long vowels (silent-e)
+  longVowels: [
+    'cake', 'tape', 'game', 'cape', 'name',
+    'kite', 'five', 'dime', 'hide', 'ride',
+    'home', 'bone', 'rope', 'hope', 'note',
+    'cube', 'mule', 'tune', 'cute', 'fume'
+  ],
+
   // Vowel teams
-  'rain', 'feet', 'boat', 'pie', 'play',
-  'see', 'road', 'tie', 'day', 'tree',
+  vowelTeams: [
+    'rain', 'play', 'day', 'say', 'tray',
+    'feet', 'see', 'tree', 'seed', 'keep',
+    'boat', 'road', 'coat', 'goat', 'float',
+    'pie', 'tie', 'lie', 'die'
+  ],
+
+  // R-controlled vowels
+  rControlled: [
+    'car', 'star', 'hard', 'park', 'farm',
+    'for', 'fork', 'born', 'corn', 'sort',
+    'her', 'fern', 'bird', 'dirt', 'burn'
+  ],
+
+  // Diphthongs and variant vowels
+  diphthongs: [
+    'oil', 'coin', 'toy', 'joy', 'boil', 'join',
+    'out', 'cloud', 'cow', 'brown', 'pout', 'frown',
+    'book', 'took', 'moon', 'soon', 'food', 'zoo',
+    'saw', 'draw', 'lawn', 'fawn', 'haunt', 'fault',
+    'new', 'few', 'chew', 'blue', 'clue', 'glue'
+  ],
+
+  // Inflected endings
+  inflectedEndings: [
+    'jumped', 'called', 'wanted',
+    'rolled', 'landed', 'painted',
+    'running', 'swimming', 'shopping',
+    'jumping', 'writing', 'baking'
+  ],
+
+  // Multisyllabic words
+  multisyllabic: [
+    'laptop', 'sunset', 'inside', 'backpack', 'campfire',
+    'music', 'baby', 'robot', 'tiger', 'paper',
+    'magnet', 'picnic', 'insect', 'problem', 'basket'
+  ]
+};
+
+export const getRandomWords = (category, count) => {
+  if (!sightWords[category]) return [];
   
-  // R-controlled
-  'car', 'her', 'for', 'star', 'fern',
-  'bird', 'fork', 'hard', 'dirt', 'born',
-  
-  // --- 2nd Grade Level (Multisyllabic & Advanced Patterns) ---
-  // Diphthongs
-  'oil', 'out', 'coin', 'cloud', 'toy',
-  'cow', 'join', 'house', 'joy', 'brown',
-  
-  // Complex vowel teams
-  'book', 'moon', 'saw', 'new', 'food',
-  'draw', 'few', 'soon', 'lawn', 'chew',
-  
-  // Inflectional endings
-  'jumped', 'running', 'wanted', 'happier', 'biggest',
-  
-  // --- 3rd-4th Grade Level (Morphology & Academic Words) ---
-  // Prefixes/suffixes
-  'unhappy', 'recall', 'dislike', 'preheat', 'mistake',
-  'careful', 'slowly', 'teacher', 'hopeful', 'quickest',
-  
-  // Academic vocabulary
-  'explain', 'compare', 'measure', 'observe', 'predict',
-  'between', 'against', 'during', 'before', 'after'
-];
+  const shuffled = [...sightWords[category]].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+};
